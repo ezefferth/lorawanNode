@@ -1,4 +1,3 @@
-
 #include "config.h"
 #include "EEPROM.h"
 #include <SPI.h>
@@ -10,13 +9,12 @@ uint64_t devEUI = RADIOLIB_LORAWAN_DEV_EUI;
 uint8_t appKey[16] = { RADIOLIB_LORAWAN_APP_KEY };
 uint8_t nwkKey[16] = { RADIOLIB_LORAWAN_NWK_KEY };
 
-//definicoes iniciais de conexao
+// Definições iniciais de conexão
 const LoRaWANBand_t Region = AU915;
 const uint8_t subBand = 2;
 
 SX1262 radio = new Module(41, 39, 42, 40);
 LoRaWANNode node(&radio, &Region, subBand);
-
 
 // ============================================================================
 
@@ -28,22 +26,17 @@ uint16_t total = 0;
 uint16_t indiceEnvio = 0;
 
 // === Controle de estado ===
-
-enum Estado { COLETANDO,
-              ENVIANDO,
-              PAUSANDO };
+enum Estado { COLETANDO, ENVIANDO, PAUSANDO };
 Estado estadoAtual = COLETANDO;
 
 // ============================================================================
 
-
 unsigned long tempoInicio, ultimoEnvio;
+unsigned long tempoTransmissaoInicio, tempoTransmissaoFim;  // ✅ Variáveis adicionadas
 const unsigned long INTERVALO_COLETA = 2;    // 500Hz = a cada 2ms
 const unsigned long DURACAO_COLETA = 30000;  // 30 segundos
 const unsigned long INTERVALO_ENVIO = 200;   // a cada 0.2 segundos
-const unsigned long PAUSA_FINAL = 15000;     // 1 minuto
-
-
+const unsigned long PAUSA_FINAL = 15000;     // 15 segundos
 
 void setup() {
   Serial.begin(115200);
@@ -51,8 +44,7 @@ void setup() {
   int16_t state = radio.begin();
   if (state != RADIOLIB_ERR_NONE) {
     Serial.printf("❌ Erro ao iniciar rádio: %d\n", state);
-    while (true)
-      ;
+    while (true);
   }
 
   EEPROM.begin(36);
@@ -69,14 +61,14 @@ void setup() {
 
   node.setADR(false);
   node.setDutyCycle(false);
-  node.setClass(RADIOLIB_LORAWAN_CLASS_C);  // modo sem espera de downlink
+  node.setClass(RADIOLIB_LORAWAN_CLASS_C);
   node.setDatarate(LORAWAN_UPLINK_DATA_RATE);
 
   Serial.println("✅ Sistema pronto para envio Classe C!");
 
-  // simular ECG
+  // Simular ECG
   for (int i = 0; i < MAX_AMOSTRAS; i++) {
-    ecgBuffer[i] = 1500;  // Simula 1.5V em mV
+    ecgBuffer[i] = 1500;
   }
 
   tempoInicio = millis();
@@ -92,14 +84,14 @@ void loop() {
       static unsigned long ultimoColeta = 0;
       if (agora - ultimoColeta >= INTERVALO_COLETA) {
         ultimoColeta = agora;
-        ecgBuffer[total++] = 1500;  // valor fixo simulado (1.5V em mV)
+        ecgBuffer[total++] = 1500;
       }
     } else {
       Serial.println("⏫ Iniciando envio...");
       estadoAtual = ENVIANDO;
       tempoInicio = agora;
       indiceEnvio = 0;
-      tempoTransmissaoInicio = millis();  // ⏱ início da transmissão
+      tempoTransmissaoInicio = millis();  // ✅ Corrigido
     }
   }
 
@@ -115,7 +107,7 @@ void loop() {
       }
 
       int16_t status = node.sendReceive(payload, blocos * 2, LORAWAN_UPLINK_USER_PORT);
-      if (status == RADIOLIB_ERR_NONE || status == RADIOLIB_LORAWAN_NO_DOWNLINK) {
+      if (status == RADIOLIB_ERR_NONE) {
         Serial.printf("📤 Pacote [%d-%d] enviado com sucesso\n", indiceEnvio, indiceEnvio + blocos - 1);
       } else {
         Serial.printf("❌ Erro ao enviar pacote [%d-%d]: %s\n", indiceEnvio, indiceEnvio + blocos - 1, stateDecode(status).c_str());
@@ -125,11 +117,11 @@ void loop() {
     }
 
     if (indiceEnvio >= total) {
-      tempoTransmissaoFim = millis();  // ⏱ fim da transmissão
+      tempoTransmissaoFim = millis();  // ✅ Corrigido
       unsigned long duracao = tempoTransmissaoFim - tempoTransmissaoInicio;
       Serial.printf("✅ Transmissão completa em %.2f segundos\n", duracao / 1000.0);
 
-      Serial.println("🕒 Pausa de 1 minutos...");
+      Serial.println("🕒 Pausa de 15 segundos...");
       tempoInicio = agora;
       estadoAtual = PAUSANDO;
     }
